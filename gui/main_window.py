@@ -1,11 +1,13 @@
 import sys
+from tkinter import messagebox
+
 
 from PyQt6 import uic, QtGui, QtCore
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QPixmap, QAction
 from PyQt6.QtWidgets import QMainWindow, QLabel, QProgressBar, QHBoxLayout, QWidget, QTextEdit, QListWidget, \
     QDateTimeEdit, QPushButton, QSpinBox, QTabWidget, QLineEdit, QDoubleSpinBox, QRadioButton, QCheckBox, \
-    QListWidgetItem, QTableWidget, QGridLayout, QMessageBox, QFileDialog, QApplication
+    QListWidgetItem, QTableWidget, QGridLayout, QMessageBox, QFileDialog, QApplication, QComboBox
 
 import input.influx_manager as influx
 import input.sqlite_manager as sqlite
@@ -13,8 +15,8 @@ import procedures.calculation as calc
 import writers.linksets_manager as setsman
 import writers.log_manager as logger
 from gui.form_dialog import FormDialog
-from gui.selection_dialog import SelectionDialog
 from gui.results_widget import ResultsWidget
+from gui.selection_dialog import SelectionDialog
 
 
 # TODO: move Control Tab elements into separate widget. Currently, this class contains main logic + Control Tab widgets.
@@ -99,6 +101,12 @@ class MainWindow(QMainWindow):
         self.check_dummy = self.findChild(QCheckBox, "checkDummy")
         self.spin_waa_schleiss_val = self.findChild(QDoubleSpinBox, "spinSchleissWaa")
         self.spin_waa_schleiss_tau = self.findChild(QDoubleSpinBox, "spinSchleissTau")
+        self.combo_box = self.findChild(QComboBox, "comboBox")
+
+        # self.combo_box = QComboBox(self)
+
+        # showing content on the screen though label
+        # self.label.setText("Index : " + str(index))
 
         # declare dictionary for created tabs with calculation results
         # <key: int = result ID, value: ResultsWidget>
@@ -120,10 +128,14 @@ class MainWindow(QMainWindow):
         self.butt_del_set.clicked.connect(self.delete_linkset_fired)
         self.butt_choose_path.clicked.connect(self.choose_path_fired)
 
+        # make combo clickable
+        self.combo_box.activated.connect(self.combo_pressed)
+
         # connect other signals
         self.spin_timestep.valueChanged.connect(self._adjust_window)
 
         # style out link table
+
         self.selection_table.setColumnWidth(0, 40)
         self.selection_table.setColumnWidth(1, 42)
         self.selection_table.setColumnWidth(2, 42)
@@ -172,7 +184,7 @@ class MainWindow(QMainWindow):
         print(f"SQLite link database file connected: {len(self.links)} microwave link's definitions loaded.")
 
         # init link sets
-        self.current_selection = {}   # link channel selection flag: 0=none, 1=A, 2=B, 3=both -> dict: <link_id>: flag
+        self.current_selection = {}  # link channel selection flag: 0=none, 1=A, 2=B, 3=both -> dict: <link_id>: flag
         self.sets_man = setsman.LinksetsManager(self.links)
         self.lists.currentTextChanged.connect(self._linkset_selected)
 
@@ -187,6 +199,36 @@ class MainWindow(QMainWindow):
         # output default path, TODO: load from options
         self.path = './outputs'
         self.path_box.setText(self.path + '/<time>')
+
+        # function of combobox
+    def combo_pressed(self):
+
+        # finding the current item index  in combo box
+        index = self.combo_box.currentIndex()
+        # val = self.combo_box.currentText()
+        # messagebox.showinfo("Upozorneni", self.combo_box.currentText())
+        compressed = index
+
+        if index == 0:
+
+            msg = "Chosen WAA method: " + self.combo_box.currentText()
+            print(f"{msg}")
+            self.statusBar().showMessage(msg)
+            #messagebox.showinfo("Vybrana metoda", self.combo_box.currentText())
+
+        elif index == 1:
+
+            msg = "Chosen WAA method: " + self.combo_box.currentText()
+            print(f"{msg}")
+            self.statusBar().showMessage(msg)
+
+        elif index == 2:
+
+            msg = "Chosen WAA method: " + self.combo_box.currentText()
+            print(f"{msg}")
+            self.statusBar().showMessage(msg)
+
+        return index
 
     # influxDB's status selection logic, called from signal
     def check_influx_status(self, influx_ping: bool):
@@ -295,12 +337,13 @@ class MainWindow(QMainWindow):
         is_pdf = self.pdf_box.isChecked()
         is_png = self.png_box.isChecked()
         is_dummy = self.check_dummy.isChecked()
+        compressed = self.combo_pressed() # ukládám do compressedu index comba
         waa_schleiss_val = self.spin_waa_schleiss_val.value()
         waa_schleiss_tau = self.spin_waa_schleiss_tau.value()
         close_func = self.close_tab_result
 
         # INPUT CHECKS:
-        if time_diff < 0:   # if timediff is less than 1 hour (in msecs)
+        if time_diff < 0:  # if timediff is less than 1 hour (in msecs)
             msg = "Bad input! Entered bigger (or same) start date than end date!"
             print(f"[WARNING] {msg}")
         elif time_diff < 3600000:
@@ -327,7 +370,7 @@ class MainWindow(QMainWindow):
             calculation = calc.Calculation(self.calc_signals, self.result_id, self.links, self.current_selection, start,
                                            end, step, rolling_values, output_step, is_only_overall, is_output_total,
                                            wet_dry_deviation, baseline_samples, interpol_res, idw_power, idw_near,
-                                           idw_dist, waa_schleiss_val, waa_schleiss_tau)
+                                           idw_dist, waa_schleiss_val, waa_schleiss_tau, compressed)  #metodawaa
 
             if self.results_name.text() == "":
                 results_tab_name = "<no name>"
@@ -357,8 +400,8 @@ class MainWindow(QMainWindow):
             self.butt_start.setEnabled(False)
 
             # RUN calculation on worker thread from threadpool
-            self.threadpool.start(calculation)
-            # calculation.run()  # TEMP: run directly on gui thread for debugging reasons
+            #self.threadpool.start(calculation)
+            calculation.run()  # TEMP: run directly on gui thread for debugging reasons
 
             msg = "Processing..."
 
@@ -466,7 +509,7 @@ class MainWindow(QMainWindow):
         if status:  # True == connected
             self.status_db_state.setText("Connected")
             self.status_db_icon_lbl.setPixmap(QPixmap('./gui/icons/check_green.png'))
-        else:       # False == disconnected
+        else:  # False == disconnected
             self.status_db_state.setText("Disconnected")
             self.status_db_icon_lbl.setPixmap(QPixmap('./gui/icons/cross_red.png'))
 
