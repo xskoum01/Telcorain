@@ -2,6 +2,8 @@ import numpy as np
 import pycomlink as pycml
 import xarray as xr
 from PyQt6.QtCore import QRunnable, QObject, QDateTime, pyqtSignal
+from procedures import linear_regression
+from procedures import temperature
 
 import input.influx_manager as influx
 from tkinter import messagebox
@@ -27,7 +29,7 @@ class Calculation(QRunnable):
                  end: QDateTime, interval: int, rolling_vals: int, output_step: int, is_only_overall: bool,
                  is_output_total: bool, wet_dry_deviation: float, baseline_samples: int, interpol_res, idw_pow,
                  idw_near, idw_dist, schleiss_val, schleiss_tau,
-                 compressed):  # compressed je promenna 0-2 do ktere ukladam index comba
+                 compressed):
         QRunnable.__init__(self)
 
         self.sig = signals
@@ -251,6 +253,11 @@ class Calculation(QRunnable):
             print(f"[CALC ID: {self.results_id}] Smoothing signal data...")
             link_count = len(calc_data)
             curr_link = 0
+            count = 0
+            link_todelete = []
+
+
+            temperature.Temperature.temperature()
 
             # interpolate NaNs in input data and filter out nonsenses out of limits
             for link in calc_data:
@@ -276,9 +283,21 @@ class Calculation(QRunnable):
                 link['temperature_tx'] = link.temperature_tx.astype(float).fillna(0.0)
 
                 self.sig.progress_signal.emit({'prg_val': round((curr_link / link_count) * 15) + 35})
-
-                self.sig.progress_signal.emit({'prg_val': round((curr_link / link_count) * 15) + 35})
                 curr_link += 1
+                count += 1
+                # print(link['trsl'])
+                # print(link['temperature_tx'])
+                linear_regression.Linear_regression.compensation(self, link)
+                # correlation.Correlation.pearson_correlation(self, count, ips, curr_link, link_todelete, link)
+
+                curr_link += 1
+
+            for link in link_todelete:
+                calc_data.remove(link)
+
+            # for link in link_compensation:
+            # calc_data.append(link)
+
 
             # process each link -> get intensity R value for each link:
             print(f"[CALC ID: {self.results_id}] Computing rain values...")
@@ -288,6 +307,11 @@ class Calculation(QRunnable):
                 # determine wet periods
                 link['wet'] = link.trsl.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
                               self.wet_dry_deviation
+
+                # hokus pokus
+                link['temperature_tx'] = link.temperature.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
+                              self.wet_dry_deviation
+
 
                 # calculate ratio of wet periods
                 link['wet_fraction'] = (link.wet == 1).sum() / (link.wet == 0).sum()
@@ -300,7 +324,6 @@ class Calculation(QRunnable):
                 link['A_rain'] = link.A_rain.where(link.A_rain >= 0, 0)
 
                 # calculate wet antenna attenuation
-
                 if 0 == self.compressed:
                     link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl, baseline=link.baseline,
                                                                                  wet=link.wet,
