@@ -256,9 +256,6 @@ class Calculation(QRunnable):
             count = 0
             link_todelete = []
 
-
-            temperature.Temperature.temperature()
-
             # interpolate NaNs in input data and filter out nonsenses out of limits
             for link in calc_data:
                 # TODO: load upper tx power from options (here it's 99 dBm)
@@ -286,11 +283,17 @@ class Calculation(QRunnable):
                 curr_link += 1
                 count += 1
                 # print(link['trsl'])
+                # print("tady teplota nevim")
                 # print(link['temperature_tx'])
-                linear_regression.Linear_regression.compensation(self, link)
+                #linear_regression.Linear_regression.compensation(self, link)
                 # correlation.Correlation.pearson_correlation(self, count, ips, curr_link, link_todelete, link)
 
                 curr_link += 1
+
+                #for temperature_tx in link['temperature_tx']:
+                    # print("spoj č. ", curr_link, temperature_tx)
+                    # print(temperature_tx)
+                    #curr_link += 1
 
             for link in link_todelete:
                 calc_data.remove(link)
@@ -298,10 +301,10 @@ class Calculation(QRunnable):
             # for link in link_compensation:
             # calc_data.append(link)
 
-
             # process each link -> get intensity R value for each link:
             print(f"[CALC ID: {self.results_id}] Computing rain values...")
             curr_link = 0
+            link_number = 1
 
             for link in calc_data:
                 # determine wet periods
@@ -309,9 +312,8 @@ class Calculation(QRunnable):
                               self.wet_dry_deviation
 
                 # hokus pokus
-                link['temperature_tx'] = link.temperature.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
-                              self.wet_dry_deviation
-
+                #link['temperature_tx'] = link.temperature_tx.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
+                # self.wet_dry_deviation
 
                 # calculate ratio of wet periods
                 link['wet_fraction'] = (link.wet == 1).sum() / (link.wet == 0).sum()
@@ -322,6 +324,46 @@ class Calculation(QRunnable):
 
                 link['A_rain'] = link.trsl - link.baseline
                 link['A_rain'] = link.A_rain.where(link.A_rain >= 0, 0)
+
+                # unit temperature
+                #for temperature_tx in link['temperature_tx']:
+                    #print("spoj č. ", link_number, temperature_tx)
+                    #print(temperature_tx[1]-temperature_tx[0])
+                    #link_number += 1
+
+                curr_temp = 1
+                temperature_diff = 0
+                rain = False
+                for temperature_tx in link['temperature_tx']:
+                    print(f"Number of Link = {link_number}")
+                    print(temperature_tx)
+                    #list = temperature_tx.tolist()
+                    a = list(temperature_tx)
+                    print(f"len = {len(a)}")
+
+                    #if curr_temp >= len(a):
+                        #curr_temp == 1
+                        #break
+                    #else:
+
+                    for temperature in a:
+                        if curr_temp >= len(a):
+                            curr_temp == 1
+                            link_number += 1
+                            break
+                        else:
+                            print(f"current temp = {curr_temp}")
+                            temperature_diff = a[curr_temp-1] - a[curr_temp]
+                            curr_temp += 1
+                            print(f"Temperature difference: {temperature_diff}, Index number of actual Temperature: {curr_temp}")
+
+                            if temperature_diff > 5:
+                                rain = True
+                            else:
+                                rain = False
+
+                            print(rain)
+                            print(curr_temp)
 
                 # calculate wet antenna attenuation
                 if 0 == self.compressed:
