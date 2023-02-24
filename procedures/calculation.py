@@ -331,27 +331,23 @@ class Calculation(QRunnable):
                     #print(temperature_tx[1]-temperature_tx[0])
                     #link_number += 1
 
+                # unit temperature
                 curr_temp = 1
                 temperature_diff = 0
                 rain = False
                 for temperature_tx in link['temperature_tx']:
                     print(f"Number of Link = {link_number}")
                     print(temperature_tx)
-                    #list = temperature_tx.tolist()
                     a = list(temperature_tx)
                     print(f"len = {len(a)}")
 
-                    #if curr_temp >= len(a):
-                        #curr_temp == 1
-                        #break
-                    #else:
-
                     for temperature in a:
                         if curr_temp >= len(a):
-                            curr_temp == 1
+                            curr_temp = 1
                             link_number += 1
                             break
                         else:
+                            print(f"Zacatek sekvence")
                             print(f"current temp = {curr_temp}")
                             temperature_diff = a[curr_temp-1] - a[curr_temp]
                             curr_temp += 1
@@ -362,8 +358,7 @@ class Calculation(QRunnable):
                             else:
                                 rain = False
 
-                            print(rain)
-                            print(curr_temp)
+                            print(f"Aktualni stav deste = {rain}")
 
                 # calculate wet antenna attenuation
                 if 0 == self.compressed:
