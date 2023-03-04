@@ -1,44 +1,54 @@
+from builtins import range
 import numpy as np
 import pandas as pd
-import xarray as xr
+
+from numba import jit
+
+#from .xarray_wrapper import xarray_apply_along_time_dim
+
+#@xarray_apply_along_time_dim()
+def baseline_constant(temperature, wet, n_average_last_dry=1):
+    """
+    Build baseline with constant level during a `wet` period
+    Parameters
+    ----------
+    temperature : numpy.array or pandas.Series
+        Array of the temperatures of the units.
+    wet : numpy.array or pandas.Series
+        Information if classified index of times series is wet (True)
+        or dry (False). Note that `NaN`s in `wet` will lead to `NaN`s in
+        `baseline` also after the `NaN` period since it is then not clear
+        whether or not there was a change of wet/dry within the `NaN` period.
+    n_average_last_dry: int, default = 1
+        Number of last baseline values before start of wet event that should
+        be averaged to get the value of the baseline during the wet event.
+        Note that this values should not be too large because the baseline
+        might be at an expected level, e.g. if another wet event is
+        ending shortly before.
+    Returns
+    -------
+    baselineTemp : numpy.array
+          Baseline during wet period
+    """
+
+    return _numba_baseline_constant(
+        temperature=np.asarray(temperature, dtype=np.float64),
+        wet=np.asarray(wet, dtype=np.bool),
+        n_average_last_dry=n_average_last_dry,
+    )
 
 
-class Temperature:
-
-    def unit_temperature_a(self, link):
-        temperature_a = np.array(link['temperature_tx'])
-        prsi = False
-        if temperature_a > 40:
-            prsi = False
-
+@jit(nopython=True)
+def _numba_baseline_constant(temperature, wet, n_average_last_dry):
+    baselineTemp = np.zeros_like(temperature, dtype=np.float64)
+    baselineTemp[0:n_average_last_dry] = temperature[0:n_average_last_dry]
+    for i in range(n_average_last_dry, len(temperature)):
+        if np.isnan(wet[i]):
+            baselineTemp[i] = np.NaN
+        elif wet[i] & ~wet[i - 1]:
+            baselineTemp[i] = np.mean(baselineTemp[(i - n_average_last_dry): i])
+        elif wet[i] & wet[i - 1]:
+            baselineTemp[i] = baselineTemp[i - 1]
         else:
-            prsi = True
-
-    def temperature(self, link):
-        calc_data = []
-        link_channels = []
-        curr_link = 0
-        count = 0
-        link_count = 0
-        temperature_tx = np.array(link['temperature_tx'])
-
-        calc_data.append(xr.concat(link_channels, dim="channel_id"))
-
-        # for link in calc_data:
-        #     link['temperature_rx'] = link.temperature_rx.astype(float).interpolate_na(dim='time', method='linear',
-        #                                                                               max_gap='5min')
-            # link['temperature_rx'] = link.temperature_rx.astype(float).fillna(0.0)
-
-            # link['temperature_tx'] = link.temperature_tx.astype(float).interpolate_na(dim='time', method='linear',
-            #                                                                           max_gap='5min')
-            # link['temperature_tx'] = link.temperature_tx.astype(float).fillna(0.0)
-
-            # self.sig.progress_signal.emit({'prg_val': round((curr_link / link_count) * 15) + 35})
-
-            # print("Ted neco uvidis")
-            # print("Teplota tx")
-            # print(link['temperature_tx'])
-
-            # curr_link += 1
-            # count += 1
-
+            baselineTemp[i] = temperature[i]
+    return baselineTemp

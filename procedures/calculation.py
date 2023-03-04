@@ -263,13 +263,14 @@ class Calculation(QRunnable):
                 link['tsl'] = link.tsl.astype(float).interpolate_na(dim='time', method='linear', max_gap='5min')
                 link['tsl'] = link.tsl.astype(float).fillna(0.0)
                 # TODO: load bottom rx power from options (here it's -80 dBm)
-                link['rsl'] = link.rsl.astype(float).where(link.rsl != 0.0).where(link.rsl > -80.0)
+                link['rsl'] = link.rsl.astype(float).where(link.rsl != 0.0).where(
+                    link.rsl > -80.0)  # zde vznika problem pri nejakem datumu
                 link['rsl'] = link.rsl.astype(float).interpolate_na(dim='time', method='linear', max_gap='5min')
                 link['rsl'] = link.rsl.astype(float).fillna(0.0)
 
                 link['trsl'] = link.tsl - link.rsl
                 link['trsl'] = link.trsl.astype(float).interpolate_na(dim='time', method='nearest', max_gap='5min')
-                #link['trsl'] = link.trsl.astype(float).fillna(0.0)
+                # link['trsl'] = link.trsl.astype(float).fillna(0.0)
 
                 link['temperature_rx'] = link.temperature_rx.astype(float).interpolate_na(dim='time', method='linear',
                                                                                           max_gap='5min')
@@ -283,17 +284,16 @@ class Calculation(QRunnable):
                 curr_link += 1
                 count += 1
                 # print(link['trsl'])
-                # print("tady teplota nevim")
                 # print(link['temperature_tx'])
-                #linear_regression.Linear_regression.compensation(self, link)
+                # linear_regression.Linear_regression.compensation(self, link)
                 # correlation.Correlation.pearson_correlation(self, count, ips, curr_link, link_todelete, link)
 
-                curr_link += 1
+                # curr_link += 1
 
-                #for temperature_tx in link['temperature_tx']:
-                    # print("spoj č. ", curr_link, temperature_tx)
-                    # print(temperature_tx)
-                    #curr_link += 1
+                # for temperature_tx in link['temperature_tx']:
+                # print("spoj č. ", curr_link, temperature_tx)
+                # print(temperature_tx)
+                # curr_link += 1
 
             for link in link_todelete:
                 calc_data.remove(link)
@@ -307,13 +307,10 @@ class Calculation(QRunnable):
             link_number = 1
 
             for link in calc_data:
+
                 # determine wet periods
                 link['wet'] = link.trsl.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
                               self.wet_dry_deviation
-
-                # hokus pokus
-                #link['temperature_tx'] = link.temperature_tx.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
-                # self.wet_dry_deviation
 
                 # calculate ratio of wet periods
                 link['wet_fraction'] = (link.wet == 1).sum() / (link.wet == 0).sum()
@@ -325,40 +322,10 @@ class Calculation(QRunnable):
                 link['A_rain'] = link.trsl - link.baseline
                 link['A_rain'] = link.A_rain.where(link.A_rain >= 0, 0)
 
-                # unit temperature
-                #for temperature_tx in link['temperature_tx']:
-                    #print("spoj č. ", link_number, temperature_tx)
-                    #print(temperature_tx[1]-temperature_tx[0])
-                    #link_number += 1
-
-                # unit temperature
-                curr_temp = 1
-                temperature_diff = 0
-                rain = False
-                for temperature_tx in link['temperature_tx']:
-                    print(f"Number of Link = {link_number}")
-                    print(temperature_tx)
-                    a = list(temperature_tx)
-                    print(f"len = {len(a)}")
-
-                    for temperature in a:
-                        if curr_temp >= len(a):
-                            curr_temp = 1
-                            link_number += 1
-                            break
-                        else:
-                            print(f"Zacatek sekvence")
-                            print(f"current temp = {curr_temp}")
-                            temperature_diff = a[curr_temp-1] - a[curr_temp]
-                            curr_temp += 1
-                            print(f"Temperature difference: {temperature_diff}, Index number of actual Temperature: {curr_temp}")
-
-                            if temperature_diff > 5:
-                                rain = True
-                            else:
-                                rain = False
-
-                            print(f"Aktualni stav deste = {rain}")
+                # for temperature_tx in link['temperature_tx']:
+                # print("spoj č. ", link_number, temperature_tx)
+                # print(temperature_tx[1]-temperature_tx[0])
+                # link_number += 1
 
                 # calculate wet antenna attenuation
                 if 0 == self.compressed:
@@ -368,10 +335,6 @@ class Calculation(QRunnable):
                                                                                  delta_t=60 / (
                                                                                          (60 / self.interval) * 60),
                                                                                  tau=self.schleiss_tau)
-                    # calculate final rain attenuation
-                    # link['A'] = link.trsl - link.baseline - link.waa
-                    # link['A'] = link.A.where(link.A >= 0, 0)
-
 
                 elif self.compressed == 1:
 
@@ -384,12 +347,8 @@ class Calculation(QRunnable):
                         gamma=0.0000206,
                         delta=0.24,
                         n_antenna=np.complex(1.73,
-                        0.014),
+                                             0.014),
                         l_antenna=0.001)
-
-                    # calculate final rain attenuation
-                    # link['A_rain'] = link.trsl - link.baseline - link.waa
-                    # link['A_rain'] = link.A_rain.where(link.A_rain >= 0, 0)
 
                 elif self.compressed == 2:
 
@@ -402,8 +361,79 @@ class Calculation(QRunnable):
                         zeta=0.55,
                         d=0.1)
 
+                # My WAA method
+                elif self.compressed == 3:
+
+                    # determine temperature baseline
+                    #baselineTemp = temperature.baseline_constant(temperature=link.temperature_tx, wet=link.wet,
+                                                                                   #n_average_last_dry=self.baseline_samples)
+
+                    #print(f"Baseline of the Baseline = {link.baseline}")
+
+                    #print(f"Baseline of the Temperature = {baselineTemp}")
+
+                    link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl,
+                                                                                 baseline=link.baseline,
+                                                                                 wet=link.wet,
+                                                                                 waa_max=self.schleiss_val,
+                                                                                 delta_t=60 / (
+                                                                                         (
+                                                                                                 60 / self.interval) * 60),
+                                                                                 tau=self.schleiss_tau)
+
+                    # unit temperature
+                    curr_temp = 1
+                    temperature_diff = 0
+                    rain = []
+                    position_of_array = 0
+                    for temperature_tx in link['temperature_tx']:
+                        print(f"Number of Link = {link_number}")
+                        print(temperature_tx)
+                        a = list(temperature_tx)
+                        print(f"len = {len(a)}")
+
+                        for array_rain in range (len(a)):
+                            rain += [0]
+
+                        print(f"Pole promenné rain = {rain}")
+                        print(f"A_rain: {link['A_rain']}")
+                        print(f"wet pole: {link['wet']}")
+
+                        for temperature in a:
+
+                            if curr_temp >= len(a):
+                                curr_temp = 1
+                                position_of_array = 0
+                                link_number += 1
+                                #print(f"Pole promenné rain = {rain}")
+
+                                break
+                            else:
+                                print(f"Start of Sequence")
+                                print(f"current temp = {curr_temp}")
+                                temperature_diff = a[curr_temp - 1] - a[curr_temp]
+                                print(
+                                    f"Temperature difference: {temperature_diff}, Index number of actual Temperature: {curr_temp}")
+                                curr_temp += 1
+                                if temperature_diff > 2:
+                                    rain[position_of_array] = 1
+
+                                else:
+                                    rain[position_of_array] = 0
+
+                                position_of_array += 1
+                            print(f"Aktualni stav deste = {rain[position_of_array]}")
+                            print(f"End of Sequence")
+
+
+                        # link['A'] = link.trsl - link.baseline - link.waa
+                        # link['A'] = link.A.where(link.A >= 0, 0)
+                        # print(f"útlum = {link.A}")
+
+
                 link['A'] = link.trsl - link.baseline - link.waa
                 link['A'] = link.A.where(link.A >= 0, 0)
+                print(f"útlum = {link.A}")
 
                 # calculate rain intensity
                 link['R'] = pycml.processing.k_R_relation.calc_R_from_A(A=link.A, L_km=float(link.length),
@@ -498,6 +528,9 @@ class Calculation(QRunnable):
                 print(f"[CALC ID: {self.results_id}] Interpolating spatial data for rainfall animation maps...")
 
                 # if output step is 60, it's already done
+
+                # zde upravit, aby to delilo dle temperature
+
                 if self.output_step != 60:
                     # central points of the links are considered in interpolation algorithms
                     calc_data_steps['lat_center'] = \
