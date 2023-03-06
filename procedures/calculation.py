@@ -54,6 +54,7 @@ class Calculation(QRunnable):
         self.schleiss_tau = schleiss_tau
 
     def run(self):
+        global temperature
         print(f"[CALC ID: {self.results_id}] Rainfall calculation procedure started.", flush=True)
 
         # ////// DATA ACQUISITION \\\\\\
@@ -308,6 +309,8 @@ class Calculation(QRunnable):
 
             for link in calc_data:
 
+                print(f"fiiiiirssttt = {link['temperature_tx']}")
+
                 # determine wet periods
                 link['wet'] = link.trsl.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
                               self.wet_dry_deviation
@@ -364,22 +367,26 @@ class Calculation(QRunnable):
                 # My WAA method
                 elif self.compressed == 3:
 
+                    print(f"wet pole: {link['wet']}")
+
+                    unit_A = link['wet'][:len(link['wet']) // 2]
+                    # link['wet_temperatureA'] = link['wet'][:len(link['wet'])//2]
+                    unit_B = link['wet'][len(link['wet']) // 2:]
+                    # link['wet_temperatureB'] = link['wet'][:len(link['wet'])//2]
+
+                    print(f"unit_A = {unit_A}")
+                    print(f"unit_B = {unit_B}")
+
+                    # print(f"unit_A = {link['wet_temperatureA']}")
+                    # print(f"unit_B = {link['wet_temperatureB']}")
+
                     # determine temperature baseline
-                    #baselineTemp = temperature.baseline_constant(temperature=link.temperature_tx, wet=link.wet,
-                                                                                   #n_average_last_dry=self.baseline_samples)
+                    # baselineTemp = temperature.baseline_constant(temperature=link.temperature_tx, wet=link.wet,
+                    # n_average_last_dry=self.baseline_samples)
 
-                    #print(f"Baseline of the Baseline = {link.baseline}")
+                    # print(f"Baseline of the Baseline = {link.baseline}")
 
-                    #print(f"Baseline of the Temperature = {baselineTemp}")
-
-                    link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl,
-                                                                                 baseline=link.baseline,
-                                                                                 wet=link.wet,
-                                                                                 waa_max=self.schleiss_val,
-                                                                                 delta_t=60 / (
-                                                                                         (
-                                                                                                 60 / self.interval) * 60),
-                                                                                 tau=self.schleiss_tau)
+                    # print(f"Baseline of the Temperature = {baselineTemp}")
 
                     # unit temperature
                     curr_temp = 1
@@ -392,11 +399,14 @@ class Calculation(QRunnable):
                         a = list(temperature_tx)
                         print(f"len = {len(a)}")
 
-                        for array_rain in range (len(a)):
+                        rain = [0]
+                        for array_rain in range(len(a)):
                             rain += [0]
 
-                        print(f"Pole promenné rain = {rain}")
-                        print(f"A_rain: {link['A_rain']}")
+                        print(f"Pole promenné rain aaaaaaaaa test = {rain}")
+                        print(f"delka pole rain = {len(rain)}")  # 144
+                        print(f"A_rain: {link['A_rain']}")  # 2 pole po 144 asi
+                        print(f"delka pole A_rain = {len(link['A_rain'])}")
                         print(f"wet pole: {link['wet']}")
 
                         for temperature in a:
@@ -405,7 +415,7 @@ class Calculation(QRunnable):
                                 curr_temp = 1
                                 position_of_array = 0
                                 link_number += 1
-                                #print(f"Pole promenné rain = {rain}")
+                                # print(f"Pole promenné rain = {rain}")
 
                                 break
                             else:
@@ -415,21 +425,89 @@ class Calculation(QRunnable):
                                 print(
                                     f"Temperature difference: {temperature_diff}, Index number of actual Temperature: {curr_temp}")
                                 curr_temp += 1
-                                if temperature_diff > 2:
-                                    rain[position_of_array] = 1
+                                #if temperature_diff > 2:
+                                #    rain[position_of_array] = 1
 
-                                else:
-                                    rain[position_of_array] = 0
+                                #else:
+                                #    rain[position_of_array] = 0
 
                                 position_of_array += 1
                             print(f"Aktualni stav deste = {rain[position_of_array]}")
                             print(f"End of Sequence")
 
-
                         # link['A'] = link.trsl - link.baseline - link.waa
                         # link['A'] = link.A.where(link.A >= 0, 0)
                         # print(f"útlum = {link.A}")
 
+                    """
+                    for k in range(len(a)):
+                        link['wet_temperatureA'][k] += [False]
+    
+    
+                    for j in range(len(a)):
+                        link['wet_temperatureB'][k] += [False]
+                    """
+
+                    # wet_temperatureA = unit_A
+                    #link['wet_temperatureA'] = unit_A
+                    # wet_temperatureB = unit_B
+                    #link['wet_temperatureB'] = unit_B
+
+                    # print(f"Wet_temperature of unit A (unit A) = {unit_A}")
+
+                    # print(f"Wet_temperature of unit A = {wet_temperatureA}")
+                    #print(f"Wet_temperature of unit A prvni vypis =unitA = {link['wet_temperatureA']}")
+                    # print(f"Wet_temperature of unit B = {wet_temperatureB}")
+                    #print(f"Wet_temperature of unit B prvni vypis =unit B = {link['wet_temperatureB']}")
+
+                    print(f"pole rain = {rain}")
+
+                    for i in range(len(unit_A)*2):
+                        if rain[i] == 1 and link['wet'][i] == True:  # toto je pro celý spoj, musím to udělat pro obě strany
+                            link['wet'][i] = True
+                        else:
+                            link['wet'][i] = False
+
+                    """
+                    for i in range(len(unit_B)):
+                        if rain[i] == 1 and unit_B[i] == True:  # rozděleno, asi musim rozdělit waa na kazdou stranu??
+                            unit_B[i] = True                    # protoze ted se pocita waa na celý spoj
+                        else:
+                            unit_B[i] = False
+                    """
+                    # print(f"Wet_temperature of unit A = {link['wet_temperatureA']}")
+                    # print(f"Wet_temperature of unit B = {link['wet_temperatureB']}")
+
+                    #print(f"Wet_temperature of unit A = {unit_A}")
+                    #print(f"Wet_temperature of unit B = {unit_B}")
+
+                    # xr.align(wet_temperatureA, join='inner', copy=True, indexes=None, exclude=frozenset({}))
+                    # xr.align(wet_temperatureB, join='inner', copy=True, indexes=None, exclude=frozenset({}))
+
+                    #link['wet'] = unit_A
+                    print(f"celkem = {link['wet']}")
+
+                    link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl,
+                                                                             baseline=link.baseline,
+                                                                             wet=link.wet,
+                                                                             waa_max=self.schleiss_val,
+                                                                             delta_t=60 / (
+                                                                                     (60 / self.interval) * 60),
+                                                                             tau=self.schleiss_tau)
+
+                    # link['wet'] = wet_temperatureB
+
+                    """
+                    waa_B = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl,
+                                                                     baseline=link.baseline,
+                                                                     wet=link.wet,
+                                                                     waa_max=self.schleiss_val,
+                                                                     delta_t=60 / (
+                                                                             (60 / self.interval) * 60),
+                                                                     tau=self.schleiss_tau)
+                    """
+
+                #link['waa'] = waa_A + waa_B
 
                 link['A'] = link.trsl - link.baseline - link.waa
                 link['A'] = link.A.where(link.A >= 0, 0)
