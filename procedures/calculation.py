@@ -309,7 +309,7 @@ class Calculation(QRunnable):
 
             for link in calc_data:
 
-                print(f"fiiiiirssttt = {link['temperature_tx']}")
+                #print(f"fiiiiirssttt = {link['temperature_tx']}")
 
                 # determine wet periods
                 link['wet'] = link.trsl.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
@@ -367,151 +367,80 @@ class Calculation(QRunnable):
                 # My WAA method
                 elif self.compressed == 3:
 
-                    print(f"wet pole: {link['wet']}")
+                    print(f"Array of temperature of link: {link_number} {link['temperature_tx']}")
 
-                    unit_A = link['wet'][:len(link['wet']) // 2]
-                    # link['wet_temperatureA'] = link['wet'][:len(link['wet'])//2]
-                    unit_B = link['wet'][len(link['wet']) // 2:]
-                    # link['wet_temperatureB'] = link['wet'][:len(link['wet'])//2]
+                    #a = link['temperature_tx'][0][0]        #tx teplota test
+                    #b = link['temperature_tx'][1][0]        #rx teplota test
+                    #print(a)
+                    #print(b)
 
-                    print(f"unit_A = {unit_A}")
-                    print(f"unit_B = {unit_B}")
-
-                    # print(f"unit_A = {link['wet_temperatureA']}")
-                    # print(f"unit_B = {link['wet_temperatureB']}")
-
-                    # determine temperature baseline
-                    # baselineTemp = temperature.baseline_constant(temperature=link.temperature_tx, wet=link.wet,
-                    # n_average_last_dry=self.baseline_samples)
-
-                    # print(f"Baseline of the Baseline = {link.baseline}")
-
-                    # print(f"Baseline of the Temperature = {baselineTemp}")
+                    wet_temperature = link['wet']
+                    actual = 0
 
                     # unit temperature
-                    curr_temp = 1
-                    temperature_diff = 0
-                    rain = []
-                    position_of_array = 0
-                    for temperature_tx in link['temperature_tx']:
-                        print(f"Number of Link = {link_number}")
-                        print(temperature_tx)
-                        a = list(temperature_tx)
-                        print(f"len = {len(a)}")
 
-                        rain = [0]
-                        for array_rain in range(len(a)):
-                            rain += [0]
+                    # forem projedu všechny teploty na jednotlivem spoji, takze A i B, vypocitam rozdil sousednich hodnot
+                    # pokud je tam vetsi rozdil >>> dest - ulozim do dvourozmerneho pole wet_temperature True, jinak False
 
-                        print(f"Pole promenné rain aaaaaaaaa test = {rain}")
-                        print(f"delka pole rain = {len(rain)}")  # 144
-                        print(f"A_rain: {link['A_rain']}")  # 2 pole po 144 asi
-                        print(f"delka pole A_rain = {len(link['A_rain'])}")
-                        print(f"wet pole: {link['wet']}")
-
-                        for temperature in a:
-
-                            if curr_temp >= len(a):
-                                curr_temp = 1
-                                position_of_array = 0
-                                link_number += 1
-                                # print(f"Pole promenné rain = {rain}")
-
-                                break
+                    for i in range(len(link.time)):
+                        if i >= (len(link.time)-1):
+                            link_number += 1
+                            break
+                        else:
+                            temperature_diffA = link['temperature_tx'][0][i] - link['temperature_tx'][0][i+1]
+                            temperature_diffB = link['temperature_tx'][1][i] - link['temperature_tx'][1][i+1]
+                            if temperature_diffA > 0.6:
+                                wet_temperature[0][i] = True
+                                #actual += 1
                             else:
-                                print(f"Start of Sequence")
-                                print(f"current temp = {curr_temp}")
-                                temperature_diff = a[curr_temp - 1] - a[curr_temp]
-                                print(
-                                    f"Temperature difference: {temperature_diff}, Index number of actual Temperature: {curr_temp}")
-                                curr_temp += 1
-                                #if temperature_diff > 2:
-                                #    rain[position_of_array] = 1
+                                wet_temperature[0][i] = False
+                                #actual += 1
 
-                                #else:
-                                #    rain[position_of_array] = 0
+                            if temperature_diffB > 0.6:
+                                wet_temperature[1][i] = True
+                                #actual += 1
+                            else:
+                                wet_temperature[1][i] = False
+                                #actual += 1
 
-                                position_of_array += 1
-                            print(f"Aktualni stav deste = {rain[position_of_array]}")
-                            print(f"End of Sequence")
+                    # Inicialization of wet again, because of fault override of link[wet]
+                    link['wet'] = link.trsl.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
+                                  self.wet_dry_deviation
 
-                        # link['A'] = link.trsl - link.baseline - link.waa
-                        # link['A'] = link.A.where(link.A >= 0, 0)
-                        # print(f"útlum = {link.A}")
+                    print(f"vytvorene pole z teplot: {wet_temperature}")
+                    print(f"wet normalni: {link['wet']}")
+                    print(f"delka time {len(link.time)}")
 
-                    """
-                    for k in range(len(a)):
-                        link['wet_temperatureA'][k] += [False]
-    
-    
-                    for j in range(len(a)):
-                        link['wet_temperatureB'][k] += [False]
-                    """
+                    #actual = 0
 
-                    # wet_temperatureA = unit_A
-                    #link['wet_temperatureA'] = unit_A
-                    # wet_temperatureB = unit_B
-                    #link['wet_temperatureB'] = unit_B
+                    #projizdim 2 dvourozmerne pole a hledam, kde je na stejnych pozicich True >> dest, jinak False a neprsi
+                    #hodnoty True/false ukladam do promenne linku - wet, se kterou se uz pocita finalni waa
 
-                    # print(f"Wet_temperature of unit A (unit A) = {unit_A}")
-
-                    # print(f"Wet_temperature of unit A = {wet_temperatureA}")
-                    #print(f"Wet_temperature of unit A prvni vypis =unitA = {link['wet_temperatureA']}")
-                    # print(f"Wet_temperature of unit B = {wet_temperatureB}")
-                    #print(f"Wet_temperature of unit B prvni vypis =unit B = {link['wet_temperatureB']}")
-
-                    print(f"pole rain = {rain}")
-
-                    for i in range(len(unit_A)*2):
-                        if rain[i] == 1 and link['wet'][i] == True:  # toto je pro celý spoj, musím to udělat pro obě strany
-                            link['wet'][i] = True
+                    for k in range(len(link.time)):
+                        if wet_temperature[0][k] == True and link['wet'][0][k] == True:
+                            link['wet'][0][k] = True
                         else:
-                            link['wet'][i] = False
+                            link['wet'][0][k] = False
 
-                    """
-                    for i in range(len(unit_B)):
-                        if rain[i] == 1 and unit_B[i] == True:  # rozděleno, asi musim rozdělit waa na kazdou stranu??
-                            unit_B[i] = True                    # protoze ted se pocita waa na celý spoj
+                        if wet_temperature[1][k] == True and link['wet'][1][k] == True:
+                            link['wet'][1][k] = True
                         else:
-                            unit_B[i] = False
-                    """
-                    # print(f"Wet_temperature of unit A = {link['wet_temperatureA']}")
-                    # print(f"Wet_temperature of unit B = {link['wet_temperatureB']}")
+                            link['wet'][1][k] = False
 
-                    #print(f"Wet_temperature of unit A = {unit_A}")
-                    #print(f"Wet_temperature of unit B = {unit_B}")
+                    print(f"wet z teplot a z trsl: {link['wet']}")
 
-                    # xr.align(wet_temperatureA, join='inner', copy=True, indexes=None, exclude=frozenset({}))
-                    # xr.align(wet_temperatureB, join='inner', copy=True, indexes=None, exclude=frozenset({}))
+                    #vypocet waa s mnou upravenym polem link[wet]
 
-                    #link['wet'] = unit_A
-                    print(f"celkem = {link['wet']}")
-
-                    link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl,
-                                                                             baseline=link.baseline,
-                                                                             wet=link.wet,
-                                                                             waa_max=self.schleiss_val,
-                                                                             delta_t=60 / (
+                    link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl, baseline=link.baseline,
+                                                                                 wet=link.wet,
+                                                                                 waa_max=self.schleiss_val,
+                                                                                 delta_t=60 / (
                                                                                      (60 / self.interval) * 60),
-                                                                             tau=self.schleiss_tau)
-
-                    # link['wet'] = wet_temperatureB
-
-                    """
-                    waa_B = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl,
-                                                                     baseline=link.baseline,
-                                                                     wet=link.wet,
-                                                                     waa_max=self.schleiss_val,
-                                                                     delta_t=60 / (
-                                                                             (60 / self.interval) * 60),
-                                                                     tau=self.schleiss_tau)
-                    """
-
-                #link['waa'] = waa_A + waa_B
+                                                                                 tau=self.schleiss_tau)
 
                 link['A'] = link.trsl - link.baseline - link.waa
                 link['A'] = link.A.where(link.A >= 0, 0)
-                print(f"útlum = {link.A}")
+                #print(f"útlum = {link.A}")
 
                 # calculate rain intensity
                 link['R'] = pycml.processing.k_R_relation.calc_R_from_A(A=link.A, L_km=float(link.length),
