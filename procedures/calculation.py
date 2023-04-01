@@ -20,7 +20,7 @@ class Calculation(QRunnable):
     compressed: object
     # TODO: load from options
     # rendered area borders
-    X_MIN = 14.21646819
+    X_MIN = 14.21646819   # souradnice 4 rohy Prahy, jeste v result widget jsou dalsi souradnice
     X_MAX = 14.70604375
     Y_MIN = 49.91505682
     Y_MAX = 50.22841327
@@ -367,43 +367,34 @@ class Calculation(QRunnable):
                 # My WAA method
                 elif self.compressed == 3:
 
-                    print(f"Array of temperature of link: {link_number} {link['temperature_tx']}")
-
-                    #a = link['temperature_tx'][0][0]        #tx teplota test
-                    #b = link['temperature_tx'][1][0]        #rx teplota test
-                    #print(a)
-                    #print(b)
+                    print(f"Transmission Unit (A unit): {link.temperature_tx.sel(channel_id='A(rx)_B(tx)')}")
+                    print(f"Receiving Unit (B unit): {link.temperature_tx.sel(channel_id='B(rx)_A(tx)')}")
 
                     wet_temperature = link['wet']
-                    actual = 0
 
                     # unit temperature
 
                     # forem projedu všechny teploty na jednotlivem spoji, takze A i B, vypocitam rozdil sousednich hodnot
-                    # pokud je tam vetsi rozdil >>> dest - ulozim do dvourozmerneho pole wet_temperature True, jinak False
+                    # pokud je tam vetsi rozdil >>> dest - ulozim do dvourozmerneho pole wet_temperature jako True, jinak False
 
                     for i in range(len(link.time)):
                         if i >= (len(link.time)-1):
                             link_number += 1
                             break
                         else:
-                            temperature_diffA = link['temperature_tx'][0][i] - link['temperature_tx'][0][i+1]
-                            temperature_diffB = link['temperature_tx'][1][i] - link['temperature_tx'][1][i+1]
-                            if temperature_diffA > 0.6:
+                            temperature_diffA = link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i] - link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i+1]
+                            temperature_diffB = link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i] - link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i+1]
+                            if temperature_diffA > 0.3:
                                 wet_temperature[0][i] = True
-                                #actual += 1
                             else:
                                 wet_temperature[0][i] = False
-                                #actual += 1
 
-                            if temperature_diffB > 0.6:
+                            if temperature_diffB > 0.3:
                                 wet_temperature[1][i] = True
-                                #actual += 1
                             else:
                                 wet_temperature[1][i] = False
-                                #actual += 1
 
-                    # Inicialization of wet again, because of fault override of link[wet]
+                    # Inicialization of wet again, because of fault override of link['wet']
                     link['wet'] = link.trsl.rolling(time=self.rolling_vals, center=True).std(skipna=False) > \
                                   self.wet_dry_deviation
 
@@ -413,8 +404,8 @@ class Calculation(QRunnable):
 
                     #actual = 0
 
-                    #projizdim 2 dvourozmerne pole a hledam, kde je na stejnych pozicich True >> dest, jinak False a neprsi
-                    #hodnoty True/false ukladam do promenne linku - wet, se kterou se uz pocita finalni waa
+                    # projizdim 2 dvourozmerne pole a hledam, kde je na stejnych pozicich True >> dest, jinak False a neprsi
+                    # hodnoty True/false ukladam do promenne linku - wet, se kterou se uz pocita finalni waa
 
                     for k in range(len(link.time)):
                         if wet_temperature[0][k] == True and link['wet'][0][k] == True:
