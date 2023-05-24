@@ -1,12 +1,13 @@
 import numpy as np
+import pandas as pd
 import pycomlink as pycml
 import xarray as xr
 from PyQt6.QtCore import QRunnable, QObject, QDateTime, pyqtSignal
-from procedures import linear_regression
-from procedures import temperature
+#from procedures import linear_regression
+#from procedures import temperature
 
 import input.influx_manager as influx
-from tkinter import messagebox
+#from tkinter import messagebox
 
 
 class CalcSignals(QObject):
@@ -24,6 +25,14 @@ class Calculation(QRunnable):
     X_MAX = 14.70604375
     Y_MIN = 49.91505682
     Y_MAX = 50.22841327
+
+    #Brno
+    """
+    X_MIN = 16.5353817   # souradnice 4 rohy Brna, jeste v result widget jsou dalsi souradnice
+    X_MAX = 16.7091028
+    Y_MIN = 49.1365058
+    Y_MAX = 49.2483533
+    """
 
     def __init__(self, signals: CalcSignals, results_id: int, links: dict, selection: dict, start: QDateTime,
                  end: QDateTime, interval: int, rolling_vals: int, output_step: int, is_only_overall: bool,
@@ -271,7 +280,7 @@ class Calculation(QRunnable):
 
                 link['trsl'] = link.tsl - link.rsl
                 link['trsl'] = link.trsl.astype(float).interpolate_na(dim='time', method='nearest', max_gap='5min')
-                # link['trsl'] = link.trsl.astype(float).fillna(0.0)
+                link['trsl'] = link.trsl.astype(float).fillna(0.0)
 
                 link['temperature_rx'] = link.temperature_rx.astype(float).interpolate_na(dim='time', method='linear',
                                                                                           max_gap='5min')
@@ -384,6 +393,28 @@ class Calculation(QRunnable):
                         else:
                             temperature_diffA = link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i] - link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i+1]
                             temperature_diffB = link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i] - link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i+1]
+
+                            #slope_A = pd.Series(np.gradient(link.temperature_tx.sel(channel_id='A(rx)_B(tx)').data), name='slope')
+                            #slope_B = pd.Series(np.gradient(link.temperature_tx.sel(channel_id='B(rx)_A(tx)').data), name='slope')
+
+                            #temperature_diffA = slope_A[i]
+                            #temperature_diffB = slope_B[i]
+                            
+                            #print(f"Slope: {slope}")
+
+                            # pro derivaci
+                            """
+                            if temperature_diffA < -0.0499:
+                                wet_temperature[0][i] = True
+                            else:
+                                wet_temperature[0][i] = False
+
+                            if temperature_diffB < -0.0499:
+                                wet_temperature[1][i] = True
+                            else:
+                                wet_temperature[1][i] = False
+
+                            """
                             if temperature_diffA > 0.3:
                                 wet_temperature[0][i] = True
                             else:
