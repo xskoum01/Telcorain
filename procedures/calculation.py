@@ -382,27 +382,29 @@ class Calculation(QRunnable):
                     wet_temperature = link['wet']
 
                     # unit temperature
-
-                    # forem projedu všechny teploty na jednotlivem spoji, takze A i B, vypocitam rozdil sousednich hodnot
-                    # pokud je tam vetsi rozdil >>> dest - ulozim do dvourozmerneho pole wet_temperature jako True, jinak False
-
                     for i in range(len(link.time)):
                         if i >= (len(link.time)-1):
                             link_number += 1
                             break
                         else:
-                            temperature_diffA = link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i] - link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i+1]
-                            temperature_diffB = link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i] - link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i+1]
+                            # first method
+                            temperature_diffA = link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i] -\
+                                                link.temperature_tx.sel(channel_id='A(rx)_B(tx)')[i+1]
+                            temperature_diffB = link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i] -\
+                                                link.temperature_tx.sel(channel_id='B(rx)_A(tx)')[i+1]
 
-                            #slope_A = pd.Series(np.gradient(link.temperature_tx.sel(channel_id='A(rx)_B(tx)').data), name='slope')
-                            #slope_B = pd.Series(np.gradient(link.temperature_tx.sel(channel_id='B(rx)_A(tx)').data), name='slope')
+                            # second method
+                            slope_A = pd.Series(np.gradient(link.temperature_tx.sel
+                                                            (channel_id='A(rx)_B(tx)').data), name='slope')
+                            slope_B = pd.Series(np.gradient(link.temperature_tx.sel
+                                                            (channel_id='B(rx)_A(tx)').data), name='slope')
 
                             #temperature_diffA = slope_A[i]
                             #temperature_diffB = slope_B[i]
                             
                             #print(f"Slope: {slope}")
 
-                            # pro derivaci
+                            # for second method
                             """
                             if temperature_diffA < -0.0499:
                                 wet_temperature[0][i] = True
@@ -415,6 +417,7 @@ class Calculation(QRunnable):
                                 wet_temperature[1][i] = False
 
                             """
+                            # for first method
                             if temperature_diffA > 0.3:
                                 wet_temperature[0][i] = True
                             else:
@@ -435,9 +438,6 @@ class Calculation(QRunnable):
 
                     #actual = 0
 
-                    # projizdim 2 dvourozmerne pole a hledam, kde je na stejnych pozicich True >> dest, jinak False a neprsi
-                    # hodnoty True/false ukladam do promenne linku - wet, se kterou se uz pocita finalni waa
-
                     for k in range(len(link.time)):
                         if wet_temperature[0][k] == True and link['wet'][0][k] == True:
                             link['wet'][0][k] = True
@@ -451,7 +451,6 @@ class Calculation(QRunnable):
 
                     print(f"wet z teplot a z trsl: {link['wet']}")
 
-                    #vypocet waa s mnou upravenym polem link[wet]
 
                     link['waa'] = pycml.processing.wet_antenna.waa_schleiss_2013(rsl=link.trsl, baseline=link.baseline,
                                                                                  wet=link.wet,
